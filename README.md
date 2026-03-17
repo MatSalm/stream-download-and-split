@@ -1,22 +1,35 @@
 Resi Video Downloader and Segmenter
 
-This repository contains a small set of scripts used to download a streamed video and split it into labeled clips. The workflow uses yt-dlp to download the video and ffmpeg to extract segments based on timestamps.
+Simple tools for downloading streamed video and cutting it into clean, labeled clips.
 
-The project was created to make it easy to archive a long streamed event and generate individual clips for specific speakers or sections.
+This repo started as a practical solution for archiving long church events and breaking them into usable segments without losing quality or spending hours re-encoding.
 
-What this project does
 
-Downloads a DASH-streamed video from a manifest URL using yt-dlp
+Overview
 
-Merges the video and audio streams into a single MP4 file
+This project supports two common video delivery types:
 
-Uses ffmpeg to cut the full recording into named segments
+DASH / HLS streams (Resi, Vimeo, etc.)
 
-The segmentation process does not re-encode the video, so clips are created very quickly and maintain the original quality.
+Direct MP4 delivery (Lifeway, Brightcove)
+
+It handles downloading, merging (when needed), and fast segment extraction.
+
+
+Features
+
+Downloads protected streams using browser session cookies
+
+Supports DASH, HLS, and direct MP4 sources
+
+Merges audio and video automatically when required
+
+Splits full recordings into clips without re-encoding
+
+Works well for long-form content like conferences, services, and teaching series
+
 
 Requirements
-
-You will need the following tools installed:
 
 Python 3
 
@@ -24,58 +37,131 @@ yt-dlp
 
 ffmpeg
 
-Install with Homebrew (Mac)
+Install (Mac)
 brew install yt-dlp
 brew install ffmpeg
-Downloading the video
+Downloading Video
+1. DASH / HLS Streams
 
-The stream is delivered using DASH, which means the video and audio tracks are downloaded separately and then merged.
+Used by platforms like Resi.
 
-720p download
-yt-dlp --cookies-from-browser firefox -f 3+8 -N 1 --fragment-retries 50 --retries 20 --merge-output-format mp4 -o full_video_720p_retry.mp4 "STREAM_URL"
+These streams separate video and audio and require merging.
 
-Format breakdown:
+720p
+yt-dlp --cookies-from-browser firefox -f 3+8 -N 1 --fragment-retries 50 --retries 20 --merge-output-format mp4 -o full_video_720p.mp4 "STREAM_URL"
+1080p
+yt-dlp --cookies-from-browser firefox -f 2+8 -N 1 --fragment-retries 50 --retries 20 --merge-output-format mp4 -o full_video_1080p.mp4 "STREAM_URL"
 
-3 = 720p video stream
+Format notes:
 
-8 = audio stream
+2 = 1080p video
 
-Expected file size: about 5 GB
+3 = 720p video
 
-1080p download
-yt-dlp --cookies-from-browser firefox -f 2+8 -N 1 --fragment-retries 50 --retries 20 --merge-output-format mp4 -o full_video_1080p_retry.mp4 "STREAM_URL"
+8 = audio
 
-Format breakdown:
+2. Direct MP4 (Lifeway / Brightcove)
 
-2 = 1080p video stream
+Some platforms expose a direct video file instead of a stream. Lifeway commonly uses Brightcove, which provides a signed MP4.
 
-8 = audio stream
+How to find it
 
-Expected file size: about 7–8 GB
+Open the video page
 
-Segment extraction
+Press F12 → Network
 
-After downloading the full video, run the Python script to generate clips.
+Filter for mp4
 
-Example command:
+Look for main.mp4
+
+Copy the full URL
+
+Download
+yt-dlp --continue --retries 20 -o lifeway_video.mp4 "MP4_URL"
+
+or
+
+curl -L -o lifeway_video.mp4 "MP4_URL"
+
+Notes:
+
+URLs are temporary (signed CDN links)
+
+You may need to refresh the page to get a new one
+
+These are often fallback files (typically 720p)
+
+Optional: Upscaling to 1080p
+
+If the source is limited to 720p, you can upscale it for better display on large screens.
+
+ffmpeg -i lifeway_video.mp4 \
+-vf "hqdn3d=1.5:1.5:6:6,scale=1920:1080:flags=lanczos,unsharp=7:7:1.0" \
+-c:v libx264 -crf 16 -preset slow \
+-c:a copy \
+lifeway_video_1080p.mp4
+
+This improves presentation quality but does not restore lost detail.
+
+
+Segment Extraction
+
+After downloading the full video:
 
 python cut_segments.py
 
-The script reads a list of timestamps and produces individual MP4 files.
-
-Example segments:
+Example output:
 
 01_intro_jennie_gloria_annie.mp4
 02_worship_give_me_jesus.mp4
 03_jennie_allen.mp4
 04_worship_power_in_the_name.mp4
-05_matt_chandler.mp4
-06_matt_and_jennie.mp4
-07_worship_the_blood.mp4
-08_francis.mp4
+...
 
-Each clip is created using:
+Each segment is created with:
 
 ffmpeg -ss START -to END -i full_video.mp4 -c copy output.mp4
 
-Because the streams are copied instead of re-encoded, the extraction process runs very quickly.
+Because the streams are copied:
+
+no re-encoding
+
+no quality loss
+
+very fast processing
+
+
+Workflow Summary
+
+Identify how the video is delivered (stream vs direct MP4)
+
+Download using yt-dlp or curl
+
+Optionally upscale for display
+
+Run segmentation script
+
+
+Notes
+
+If a page URL fails, check the Network tab for the real media source
+
+Brightcove often exposes main.mp4 directly
+
+HLS/DASH streams usually offer higher quality than fallback MP4 files
+
+
+Use Cases
+
+Church services and conferences
+
+Training content
+
+Archival recordings
+
+Speaker-based clip generation
+
+
+Disclaimer
+
+Use responsibly and ensure you have permission to download and process the content.
